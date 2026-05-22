@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fastapi
+  namespace: {{ .Values.fastapi.namespace }}
+spec:
+  replicas: {{ .Values.fastapi.replicas }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: fastapi
+  template:
+    metadata:
+      labels:
+        app: fastapi
+    spec:
+      {{- include "cyberpulse.imagePullSecrets" . | nindent 6 }}
+      containers:
+        - name: fastapi
+          image: {{ include "cyberpulse.image" (list . "fastapi") }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          ports:
+            - containerPort: 8000
+          env:
+            - name: CORS_ORIGINS
+              value: {{ .Values.fastapi.corsOrigins | quote }}
+            - name: ENABLE_HSTS
+              value: {{ .Values.fastapi.enableHsts | quote }}
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: redis-credentials
+                  key: REDIS_URL
+          envFrom:
+            - secretRef:
+                name: postgres-credentials
+            - secretRef:
+                name: fastapi-encryption
+            - secretRef:
+                name: jwt-secret
+          volumeMounts:
+            - name: reports
+              mountPath: /data/reports
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+      volumes:
+        - name: reports
+          persistentVolumeClaim:
+            claimName: reports-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fastapi
+  namespace: {{ .Values.fastapi.namespace }}
+spec:
+  type: ClusterIP
+  selector:
+    app: fastapi
+  ports:
+    - port: 8000
+      targetPort: 8000

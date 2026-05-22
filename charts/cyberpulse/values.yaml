@@ -1,0 +1,50 @@
+imagePullSecrets:
+  - name: cyberpulse-ghcr
+
+images:
+  prefix: ghcr.io/solutionscst
+  tag: latest
+  pullPolicy: Always
+  webapp:
+    repository: cyberpulse-webapp
+  fastapi:
+    repository: cyberpulse-fastapi
+  worker:
+    repository: cyberpulse-worker
+
+webapp:
+  namespace: dmz
+  replicas: 1
+
+ingress:
+  enabled: true
+  className: traefik
+  host: ""
+  path: /
+  annotations: {}
+
+fastapi:
+  namespace: internal
+  replicas: 1
+  corsOrigins: "http://localhost:3000,http://localhost:80"
+  enableHsts: "false"
+
+worker:
+  namespace: internal
+  replicas: 1
+
+redis:
+  namespace: internal
+  image: redis:7-alpine
+
+reports:
+  storage: 5Gi
+
+resources:
+  worker:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi

@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: {{ .Values.worker.namespace }}
+spec:
+  replicas: {{ .Values.worker.replicas }}
+  selector:
+    matchLabels:
+      app: worker
+  template:
+    metadata:
+      labels:
+        app: worker
+    spec:
+      {{- include "cyberpulse.imagePullSecrets" . | nindent 6 }}
+      containers:
+        - name: worker
+          image: {{ include "cyberpulse.image" (list . "worker") }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          env:
+            - name: REPORTS_DIR
+              value: "/data/reports"
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: redis-credentials
+                  key: REDIS_URL
+          envFrom:
+            - secretRef:
+                name: postgres-credentials
+            - secretRef:
+                name: fetcher-encryption
+            - secretRef:
+                name: jwt-secret
+          volumeMounts:
+            - name: reports
+              mountPath: /data/reports
+          resources:
+            requests:
+              memory: {{ .Values.resources.worker.requests.memory | quote }}
+              cpu: {{ .Values.resources.worker.requests.cpu | quote }}
+            limits:
+              memory: {{ .Values.resources.worker.limits.memory | quote }}
+              cpu: {{ .Values.resources.worker.limits.cpu | quote }}
+          livenessProbe:
+            exec:
+              command: ["arq", "--check", "worker.settings.WorkerSettings"]
+            initialDelaySeconds: 30
+            periodSeconds: 30
+      volumes:
+        - name: reports
+          persistentVolumeClaim:
+            claimName: reports-pvc

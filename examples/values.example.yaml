@@ -1,0 +1,16 @@
+images:
+  prefix: ghcr.io/solutionscst
+  tag: v1.2.0
+
+fastapi:
+  corsOrigins: "https://pulse.customer.example"
+  enableHsts: "true"
+
+reports:
+  storage: 20Gi
+
+ingress:
+  enabled: true
+  # Leave host empty to expose CyberPulse on the server IP over HTTP.
+  host: ""
+  className: traefik
