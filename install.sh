@@ -96,6 +96,29 @@ data:
 PY
 }
 
+wait_for_postgres() {
+  local pod=""
+  local deadline=$((SECONDS + 180))
+
+  echo "Waiting for PostgreSQL pod..."
+  while [ "$SECONDS" -lt "$deadline" ]; do
+    pod="$(kubectl get pods -n "$DATA_NAMESPACE" \
+      -l app.kubernetes.io/instance=postgres \
+      -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
+
+    if [ -n "$pod" ]; then
+      kubectl wait --for=condition=ready "pod/$pod" -n "$DATA_NAMESPACE" --timeout=180s
+      return
+    fi
+
+    sleep 2
+  done
+
+  echo "Timed out waiting for PostgreSQL pod to be created." >&2
+  kubectl get pods -n "$DATA_NAMESPACE" >&2 || true
+  exit 1
+}
+
 adopt_resource_if_present() {
   local namespace="$1"
   local kind="$2"
@@ -172,8 +195,7 @@ helm upgrade --install postgres bitnami/postgresql -n "$DATA_NAMESPACE" \
   --set primary.resources.limits.cpu=1000m \
   --set primary.resources.limits.memory=1Gi
 
-echo "Waiting for PostgreSQL..."
-kubectl wait --for=condition=ready pod/postgres-postgresql-0 -n "$DATA_NAMESPACE" --timeout=120s
+wait_for_postgres
 
 echo ""
 echo "=== Configuring GHCR image pull credentials ==="
