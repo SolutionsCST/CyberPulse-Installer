@@ -23,6 +23,13 @@ ingress:
   path: /
   annotations: {}
 
+cloudflare:
+  tunnel:
+    enabled: false
+    replicas: 2
+    image: cloudflare/cloudflared:latest
+    tokenSecretName: cloudflare-tunnel-token
+
 fastapi:
   namespace: internal
   replicas: 1
@@ -41,6 +48,13 @@ reports:
   storage: 5Gi
 
 resources:
+  cloudflared:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
   worker:
     requests:
       cpu: 250m
