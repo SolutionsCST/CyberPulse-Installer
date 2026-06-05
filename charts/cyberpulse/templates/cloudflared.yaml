@@ -1,0 +1,40 @@
+{{- if .Values.cloudflare.tunnel.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloudflared
+  namespace: {{ .Values.webapp.namespace }}
+spec:
+  replicas: {{ .Values.cloudflare.tunnel.replicas }}
+  selector:
+    matchLabels:
+      app: cloudflared
+  template:
+    metadata:
+      labels:
+        app: cloudflared
+    spec:
+      containers:
+        - name: cloudflared
+          image: {{ .Values.cloudflare.tunnel.image }}
+          imagePullPolicy: IfNotPresent
+          args:
+            - tunnel
+            - --no-autoupdate
+            - run
+            - --token
+            - $(TUNNEL_TOKEN)
+          env:
+            - name: TUNNEL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.cloudflare.tunnel.tokenSecretName }}
+                  key: TUNNEL_TOKEN
+          resources:
+            requests:
+              memory: {{ .Values.resources.cloudflared.requests.memory | quote }}
+              cpu: {{ .Values.resources.cloudflared.requests.cpu | quote }}
+            limits:
+              memory: {{ .Values.resources.cloudflared.limits.memory | quote }}
+              cpu: {{ .Values.resources.cloudflared.limits.cpu | quote }}
+{{- end }}

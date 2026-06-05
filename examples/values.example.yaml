@@ -14,3 +14,7 @@ ingress:
   # Leave host empty to expose CyberPulse on the server IP over HTTP.
   host: ""
   className: traefik
+
+cloudflare:
+  tunnel:
+    enabled: false

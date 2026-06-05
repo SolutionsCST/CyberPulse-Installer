@@ -6,6 +6,7 @@ WEBAPP_NAMESPACE="${CYBERPULSE_WEBAPP_NAMESPACE:-dmz}"
 INTERNAL_NAMESPACE="${CYBERPULSE_INTERNAL_NAMESPACE:-internal}"
 DATA_NAMESPACE="${CYBERPULSE_DATA_NAMESPACE:-data}"
 IMAGE_PREFIX="${CYBERPULSE_IMAGE_PREFIX:-ghcr.io/solutionscst}"
+CLOUDFLARED_IMAGE="${CLOUDFLARED_IMAGE:-cloudflare/cloudflared:latest}"
 
 require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -25,8 +26,9 @@ confirm_uninstall() {
   echo "  - Helm release: $RELEASE_NAME in namespace $INTERNAL_NAMESPACE"
   echo "  - Helm release: postgres in namespace $DATA_NAMESPACE"
   echo "  - Namespaces: $WEBAPP_NAMESPACE, $INTERNAL_NAMESPACE, $DATA_NAMESPACE"
-  echo "  - Kubernetes secrets, Postgres data PVCs, and report PVCs in those namespaces"
-  echo "  - Local CyberPulse Docker/containerd images where possible"
+  echo "  - Kubernetes secrets, including GHCR and Cloudflare Tunnel token secrets"
+  echo "  - Postgres data PVCs and report PVCs in those namespaces"
+  echo "  - Local CyberPulse/cloudflared Docker/containerd images where possible"
   echo ""
   read -r -p "Type yes to continue: " confirm
 
@@ -64,7 +66,7 @@ remove_docker_images() {
   fi
 
   docker images --format '{{.Repository}}:{{.Tag}}' \
-    | grep -E '(^|/)cyberpulse-(webapp|fastapi|worker):' \
+    | grep -E '(^|/)cyberpulse-(webapp|fastapi|worker):|^cloudflare/cloudflared:' \
     | sort -u \
     | xargs -r docker rmi 2>/dev/null || true
 
@@ -98,6 +100,8 @@ remove_containerd_image "$IMAGE_PREFIX/cyberpulse-worker:latest"
 remove_containerd_image "docker.io/library/cyberpulse-webapp:latest"
 remove_containerd_image "docker.io/library/cyberpulse-fastapi:latest"
 remove_containerd_image "docker.io/library/cyberpulse-worker:latest"
+remove_containerd_image "$CLOUDFLARED_IMAGE"
+remove_containerd_image "docker.io/cloudflare/cloudflared:latest"
 remove_docker_images
 
 echo ""

@@ -12,6 +12,13 @@ IMAGE_TAG="${CYBERPULSE_IMAGE_TAG:-}"
 IMAGE_PULL_POLICY="${CYBERPULSE_IMAGE_PULL_POLICY:-Always}"
 PULL_SECRET_NAME="${CYBERPULSE_PULL_SECRET_NAME:-cyberpulse-ghcr}"
 VALUES_FILE="${CYBERPULSE_VALUES_FILE:-}"
+ACCESS_MODE="${CYBERPULSE_ACCESS_MODE:-}"
+CYBERPULSE_PUBLIC_URL="${CYBERPULSE_PUBLIC_URL:-}"
+CYBERPULSE_CORS_ORIGINS="${CYBERPULSE_CORS_ORIGINS:-}"
+CYBERPULSE_ENABLE_HSTS="${CYBERPULSE_ENABLE_HSTS:-}"
+CLOUDFLARE_TUNNEL_TOKEN="${CLOUDFLARE_TUNNEL_TOKEN:-}"
+CLOUDFLARE_TUNNEL_SECRET_NAME="${CLOUDFLARE_TUNNEL_SECRET_NAME:-cloudflare-tunnel-token}"
+CLOUDFLARE_TUNNEL_REPLICAS="${CLOUDFLARE_TUNNEL_REPLICAS:-2}"
 
 WEBAPP_NAMESPACE="${CYBERPULSE_WEBAPP_NAMESPACE:-dmz}"
 INTERNAL_NAMESPACE="${CYBERPULSE_INTERNAL_NAMESPACE:-internal}"
@@ -55,6 +62,33 @@ prompt_if_empty() {
   printf -v "$var_name" '%s' "$value"
 }
 
+prompt_optional() {
+  local var_name="$1"
+  local prompt="$2"
+  local default="${3:-}"
+  local value="${!var_name:-}"
+
+  if [ -n "$value" ]; then
+    return
+  fi
+
+  if [ -n "$default" ]; then
+    read -r -p "$prompt [$default]: " value
+    value="${value:-$default}"
+  else
+    read -r -p "$prompt: " value
+  fi
+
+  printf -v "$var_name" '%s' "$value"
+}
+
+helm_set_escape() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//,/\\,}"
+  printf '%s' "$value"
+}
+
 create_pull_secret() {
   local namespace="$1"
 
@@ -65,6 +99,7 @@ create_pull_secret() {
 import base64
 import json
 import os
+import json
 import sys
 
 namespace = sys.argv[1]
@@ -92,6 +127,29 @@ metadata:
 type: kubernetes.io/dockerconfigjson
 data:
   .dockerconfigjson: {encoded}
+""")
+PY
+}
+
+create_cloudflare_tunnel_secret() {
+  CLOUDFLARE_TUNNEL_SECRET_NAME="$CLOUDFLARE_TUNNEL_SECRET_NAME" \
+  CLOUDFLARE_TUNNEL_TOKEN="$CLOUDFLARE_TUNNEL_TOKEN" \
+  python3 - "$WEBAPP_NAMESPACE" <<'PY' | kubectl apply -f -
+import os
+import sys
+
+namespace = sys.argv[1]
+name = os.environ["CLOUDFLARE_TUNNEL_SECRET_NAME"]
+token = os.environ["CLOUDFLARE_TUNNEL_TOKEN"]
+
+print(f"""apiVersion: v1
+kind: Secret
+metadata:
+  name: {name}
+  namespace: {namespace}
+type: Opaque
+stringData:
+  TUNNEL_TOKEN: {json.dumps(token)}
 """)
 PY
 }
@@ -162,11 +220,69 @@ prompt_if_empty IMAGE_TAG "CyberPulse image tag"
 prompt_if_empty GHCR_USERNAME "GitHub/GHCR username"
 prompt_if_empty GHCR_TOKEN "GitHub/GHCR access token" "" true
 
+if [ -z "$ACCESS_MODE" ]; then
+  echo ""
+  echo "Access mode:"
+  echo "  traefik    Expose webapp on the server/LAN over HTTP port 80"
+  echo "  cloudflare Expose webapp through Cloudflare Tunnel; no inbound ports"
+  echo "  none       Do not expose webapp; use kubectl port-forward or custom networking"
+  read -r -p "CyberPulse access mode [traefik]: " ACCESS_MODE
+  ACCESS_MODE="${ACCESS_MODE:-traefik}"
+fi
+
+case "$ACCESS_MODE" in
+  traefik|cloudflare|none) ;;
+  *)
+    echo "Invalid access mode: $ACCESS_MODE" >&2
+    echo "Expected one of: traefik, cloudflare, none" >&2
+    exit 1
+    ;;
+esac
+
+if [ "$ACCESS_MODE" = "cloudflare" ]; then
+  prompt_if_empty CLOUDFLARE_TUNNEL_TOKEN "Cloudflare Tunnel token" "" true
+fi
+
+case "$ACCESS_MODE" in
+  cloudflare)
+    prompt_if_empty CYBERPULSE_PUBLIC_URL "Public CyberPulse URL, including https://"
+    ;;
+  traefik)
+    prompt_optional CYBERPULSE_PUBLIC_URL "Public/internal CyberPulse URL, including http://"
+    ;;
+  none)
+    prompt_optional CYBERPULSE_PUBLIC_URL "CyberPulse URL for CORS, if any"
+    ;;
+esac
+
+if [ -z "$CYBERPULSE_CORS_ORIGINS" ]; then
+  CYBERPULSE_CORS_ORIGINS="http://localhost:3000,http://localhost:80"
+  if [ -n "$CYBERPULSE_PUBLIC_URL" ]; then
+    CYBERPULSE_CORS_ORIGINS="$CYBERPULSE_PUBLIC_URL,$CYBERPULSE_CORS_ORIGINS"
+  fi
+fi
+
+if [ -z "$CYBERPULSE_ENABLE_HSTS" ]; then
+  if [[ "$CYBERPULSE_PUBLIC_URL" == https://* ]]; then
+    CYBERPULSE_ENABLE_HSTS="true"
+  else
+    CYBERPULSE_ENABLE_HSTS="false"
+  fi
+fi
+
+CYBERPULSE_CORS_ORIGINS_HELM="$(helm_set_escape "$CYBERPULSE_CORS_ORIGINS")"
+
 echo "=== CyberPulse production install/update ==="
 echo "Release: $RELEASE_NAME"
 echo "Image prefix: $IMAGE_PREFIX"
 echo "Image tag: $IMAGE_TAG"
 echo "Pull policy: $IMAGE_PULL_POLICY"
+echo "Access mode: $ACCESS_MODE"
+if [ -n "$CYBERPULSE_PUBLIC_URL" ]; then
+  echo "Public URL: $CYBERPULSE_PUBLIC_URL"
+fi
+echo "CORS origins: $CYBERPULSE_CORS_ORIGINS"
+echo "HSTS enabled: $CYBERPULSE_ENABLE_HSTS"
 
 echo ""
 echo "=== Setting up Helm repos ==="
@@ -201,6 +317,12 @@ echo ""
 echo "=== Configuring GHCR image pull credentials ==="
 create_pull_secret "$WEBAPP_NAMESPACE"
 create_pull_secret "$INTERNAL_NAMESPACE"
+
+if [ "$ACCESS_MODE" = "cloudflare" ]; then
+  echo ""
+  echo "=== Configuring Cloudflare Tunnel credentials ==="
+  create_cloudflare_tunnel_secret
+fi
 
 echo ""
 echo "=== Configuring application secrets ==="
@@ -291,9 +413,25 @@ helm_args=(
   --set "imagePullSecrets[0].name=$PULL_SECRET_NAME"
   --set "webapp.namespace=$WEBAPP_NAMESPACE"
   --set "fastapi.namespace=$INTERNAL_NAMESPACE"
+  --set-string "fastapi.corsOrigins=$CYBERPULSE_CORS_ORIGINS_HELM"
+  --set-string "fastapi.enableHsts=$CYBERPULSE_ENABLE_HSTS"
   --set "worker.namespace=$INTERNAL_NAMESPACE"
   --set "redis.namespace=$INTERNAL_NAMESPACE"
+  --set "cloudflare.tunnel.tokenSecretName=$CLOUDFLARE_TUNNEL_SECRET_NAME"
+  --set "cloudflare.tunnel.replicas=$CLOUDFLARE_TUNNEL_REPLICAS"
 )
+
+case "$ACCESS_MODE" in
+  traefik)
+    helm_args+=(--set "ingress.enabled=true" --set "cloudflare.tunnel.enabled=false")
+    ;;
+  cloudflare)
+    helm_args+=(--set "ingress.enabled=false" --set "cloudflare.tunnel.enabled=true")
+    ;;
+  none)
+    helm_args+=(--set "ingress.enabled=false" --set "cloudflare.tunnel.enabled=false")
+    ;;
+esac
 
 if [ -n "$VALUES_FILE" ]; then
   helm_args+=(--values "$VALUES_FILE")
@@ -306,6 +444,9 @@ echo "=== Waiting for rollout ==="
 kubectl rollout status deployment webapp -n "$WEBAPP_NAMESPACE" --timeout=120s
 kubectl rollout status deployment fastapi -n "$INTERNAL_NAMESPACE" --timeout=120s
 kubectl rollout status deployment worker -n "$INTERNAL_NAMESPACE" --timeout=120s
+if [ "$ACCESS_MODE" = "cloudflare" ]; then
+  kubectl rollout status deployment cloudflared -n "$WEBAPP_NAMESPACE" --timeout=120s
+fi
 
 echo ""
 echo "Ready!"
