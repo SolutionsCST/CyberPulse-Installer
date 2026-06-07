@@ -136,6 +136,7 @@ create_cloudflare_tunnel_secret() {
   CLOUDFLARE_TUNNEL_TOKEN="$CLOUDFLARE_TUNNEL_TOKEN" \
   python3 - "$WEBAPP_NAMESPACE" <<'PY' | kubectl apply -f -
 import os
+import json
 import sys
 
 namespace = sys.argv[1]
