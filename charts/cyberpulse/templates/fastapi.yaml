@@ -30,6 +30,8 @@ spec:
               value: {{ .Values.fastapi.corsOrigins | quote }}
             - name: ENABLE_HSTS
               value: {{ .Values.fastapi.enableHsts | quote }}
+            - name: ENABLE_API_DOCS
+              value: {{ .Values.fastapi.enableApiDocs | quote }}
             - name: REDIS_URL
               valueFrom:
                 secretKeyRef:

@@ -5,6 +5,7 @@ images:
 fastapi:
   corsOrigins: "https://pulse.customer.example"
   enableHsts: "true"
+  enableApiDocs: "false"
 
 reports:
   storage: 20Gi
