@@ -35,6 +35,7 @@ fastapi:
   replicas: 1
   corsOrigins: "http://localhost:3000,http://localhost:80"
   enableHsts: "false"
+  enableApiDocs: "false"
 
 worker:
   namespace: internal
