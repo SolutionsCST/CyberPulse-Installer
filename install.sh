@@ -341,6 +341,7 @@ with open('/tmp/sp_public.pem', 'w') as f:
 "
 
   JWT_SECRET=$(python3 -c "import secrets; print(secrets.token_hex(32))")
+  MFA_SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_hex(32))")
   REDIS_PASSWORD=$(python3 -c "import secrets; print(secrets.token_hex(16))")
 
   kubectl create secret generic postgres-credentials \
@@ -355,6 +356,11 @@ with open('/tmp/sp_public.pem', 'w') as f:
   kubectl create secret generic jwt-secret \
     --namespace="$INTERNAL_NAMESPACE" \
     --from-literal=JWT_SECRET="$JWT_SECRET" \
+    --dry-run=client -o yaml | kubectl apply -f -
+
+  kubectl create secret generic mfa-secret \
+    --namespace="$INTERNAL_NAMESPACE" \
+    --from-literal=MFA_SECRET_KEY="$MFA_SECRET_KEY" \
     --dry-run=client -o yaml | kubectl apply -f -
 
   kubectl create secret generic fastapi-encryption \
@@ -391,6 +397,9 @@ POSTGRES_DB=cyberpulse
 [jwt-secret]
 JWT_SECRET=$JWT_SECRET
 
+[mfa-secret]
+MFA_SECRET_KEY=$MFA_SECRET_KEY
+
 [redis-credentials]
 REDIS_PASSWORD=$REDIS_PASSWORD
 REDIS_URL=redis://:${REDIS_PASSWORD}@redis.$INTERNAL_NAMESPACE.svc.cluster.local:6379
@@ -399,6 +408,23 @@ EOF
   echo "Secrets backed up to $SECRETS_BACKUP"
 else
   echo "Existing application secrets found; leaving them unchanged."
+fi
+
+if ! kubectl get secret mfa-secret -n "$INTERNAL_NAMESPACE" >/dev/null 2>&1; then
+  echo "Generating missing MFA secret..."
+  MFA_SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_hex(32))")
+  kubectl create secret generic mfa-secret \
+    --namespace="$INTERNAL_NAMESPACE" \
+    --from-literal=MFA_SECRET_KEY="$MFA_SECRET_KEY" \
+    --dry-run=client -o yaml | kubectl apply -f -
+
+  mkdir -p "$SECRETS_DIR"
+  {
+    echo ""
+    echo "[mfa-secret]"
+    echo "MFA_SECRET_KEY=$MFA_SECRET_KEY"
+  } >> "$SECRETS_BACKUP"
+  chmod 600 "$SECRETS_BACKUP"
 fi
 
 echo ""

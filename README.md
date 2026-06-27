@@ -57,7 +57,7 @@ The installer:
 5. Runs `helm upgrade --install` for the CyberPulse chart.
 6. Waits for the webapp, FastAPI, and worker rollouts.
 
-Generated application secrets are backed up to `secrets/prod-secrets.yaml`. GHCR credentials are stored only as Kubernetes image pull secrets.
+Generated application secrets are backed up to `secrets/prod-secrets.yaml`. This includes the independent `mfa-secret` used by FastAPI to encrypt authenticator-app TOTP seeds. GHCR credentials are stored only as Kubernetes image pull secrets.
 
 ## Network Access
 

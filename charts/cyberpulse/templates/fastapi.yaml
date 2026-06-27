@@ -44,6 +44,8 @@ spec:
                 name: fastapi-encryption
             - secretRef:
                 name: jwt-secret
+            - secretRef:
+                name: mfa-secret
           volumeMounts:
             - name: reports
               mountPath: /data/reports
