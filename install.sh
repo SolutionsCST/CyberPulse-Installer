@@ -23,8 +23,19 @@ CLOUDFLARE_TUNNEL_REPLICAS="${CLOUDFLARE_TUNNEL_REPLICAS:-2}"
 WEBAPP_NAMESPACE="${CYBERPULSE_WEBAPP_NAMESPACE:-dmz}"
 INTERNAL_NAMESPACE="${CYBERPULSE_INTERNAL_NAMESPACE:-internal}"
 DATA_NAMESPACE="${CYBERPULSE_DATA_NAMESPACE:-data}"
+MODE="install"
 
 mkdir -p "$SECRETS_DIR"
+
+usage() {
+  cat <<EOF
+Usage: ./install.sh [--dump-credentials] [--help]
+
+Options:
+  --dump-credentials  Back up existing application Kubernetes Secrets to $SECRETS_BACKUP and exit.
+  --help              Show this help.
+EOF
+}
 
 require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -202,13 +213,102 @@ adopt_existing_cyberpulse_resources() {
 
   adopt_resource_if_present "$INTERNAL_NAMESPACE" deployment fastapi
   adopt_resource_if_present "$INTERNAL_NAMESPACE" service fastapi
+  adopt_resource_if_present "$INTERNAL_NAMESPACE" serviceaccount fastapi
   adopt_resource_if_present "$INTERNAL_NAMESPACE" deployment worker
+  adopt_resource_if_present "$INTERNAL_NAMESPACE" serviceaccount worker
   adopt_resource_if_present "$INTERNAL_NAMESPACE" deployment redis
   adopt_resource_if_present "$INTERNAL_NAMESPACE" service redis
   adopt_resource_if_present "$INTERNAL_NAMESPACE" persistentvolumeclaim reports-pvc
+  adopt_resource_if_present "$INTERNAL_NAMESPACE" networkpolicy internal-default-deny
+  adopt_resource_if_present "$INTERNAL_NAMESPACE" networkpolicy fastapi-ingress
+  adopt_resource_if_present "$INTERNAL_NAMESPACE" networkpolicy redis-ingress
+  adopt_resource_if_present "$INTERNAL_NAMESPACE" networkpolicy app-egress
+  adopt_resource_if_present "$INTERNAL_NAMESPACE" networkpolicy worker-vendor-egress
 }
 
+read_secret_value() {
+  local secret_name="$1"
+  local key="$2"
+
+  kubectl get secret "$secret_name" -n "$INTERNAL_NAMESPACE" -o "jsonpath={.data.$key}" | base64 -d
+}
+
+dump_application_credentials() {
+  echo "Backing up existing application secrets to $SECRETS_BACKUP..."
+
+  POSTGRES_USER=$(read_secret_value postgres-credentials POSTGRES_USER)
+  POSTGRES_PASSWORD=$(read_secret_value postgres-credentials POSTGRES_PASSWORD)
+  POSTGRES_HOST=$(read_secret_value postgres-credentials POSTGRES_HOST)
+  POSTGRES_PORT=$(read_secret_value postgres-credentials POSTGRES_PORT)
+  POSTGRES_DB=$(read_secret_value postgres-credentials POSTGRES_DB)
+  JWT_SECRET=$(read_secret_value jwt-secret JWT_SECRET)
+  MFA_SECRET_KEY=$(read_secret_value mfa-secret MFA_SECRET_KEY)
+  ENCRYPTION_PUBLIC_KEY=$(read_secret_value fastapi-encryption ENCRYPTION_PUBLIC_KEY)
+  ENCRYPTION_PRIVATE_KEY=$(read_secret_value fetcher-encryption ENCRYPTION_PRIVATE_KEY)
+  REDIS_PASSWORD=$(read_secret_value redis-credentials REDIS_PASSWORD)
+  REDIS_URL=$(read_secret_value redis-credentials REDIS_URL)
+
+  cat > "$SECRETS_BACKUP" <<EOF
+# CyberPulse Prod Secrets - backed up $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+# DO NOT commit this file to git
+# GHCR credentials are stored only in Kubernetes image pull secrets.
+
+[postgres-credentials]
+POSTGRES_USER=$POSTGRES_USER
+POSTGRES_PASSWORD=$POSTGRES_PASSWORD
+POSTGRES_HOST=$POSTGRES_HOST
+POSTGRES_PORT=$POSTGRES_PORT
+POSTGRES_DB=$POSTGRES_DB
+
+[jwt-secret]
+JWT_SECRET=$JWT_SECRET
+
+[mfa-secret]
+MFA_SECRET_KEY=$MFA_SECRET_KEY
+
+[fastapi-encryption]
+ENCRYPTION_PUBLIC_KEY<<PUBLIC_KEY
+$ENCRYPTION_PUBLIC_KEY
+PUBLIC_KEY
+
+[fetcher-encryption]
+ENCRYPTION_PRIVATE_KEY<<PRIVATE_KEY
+$ENCRYPTION_PRIVATE_KEY
+PRIVATE_KEY
+
+[redis-credentials]
+REDIS_PASSWORD=$REDIS_PASSWORD
+REDIS_URL=$REDIS_URL
+EOF
+  chmod 600 "$SECRETS_BACKUP"
+  echo "Secrets backed up to $SECRETS_BACKUP"
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --dump-credentials)
+      MODE="dump-credentials"
+      ;;
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+  shift
+done
+
 require_command kubectl
+
+if [ "$MODE" = "dump-credentials" ]; then
+  dump_application_credentials
+  exit 0
+fi
+
 require_command helm
 require_command python3
 
@@ -330,15 +430,12 @@ echo "=== Configuring application secrets ==="
 if ! kubectl get secret fastapi-encryption -n "$INTERNAL_NAMESPACE" >/dev/null 2>&1; then
   echo "First run - generating secrets..."
 
-  python3 -c "
-from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.hazmat.primitives import serialization
-key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-with open('/tmp/sp_private.pem', 'w') as f:
-    f.write(key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()).decode())
-with open('/tmp/sp_public.pem', 'w') as f:
-    f.write(key.public_key().public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo).decode())
-"
+  if ! command -v openssl >/dev/null 2>&1; then
+    echo "Missing required command: openssl" >&2
+    exit 1
+  fi
+  openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out /tmp/sp_private.pem >/dev/null 2>&1
+  openssl rsa -in /tmp/sp_private.pem -pubout -out /tmp/sp_public.pem >/dev/null 2>&1
 
   JWT_SECRET=$(python3 -c "import secrets; print(secrets.token_hex(32))")
   MFA_SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_hex(32))")
@@ -379,6 +476,9 @@ with open('/tmp/sp_public.pem', 'w') as f:
     --from-literal=REDIS_URL="redis://:${REDIS_PASSWORD}@redis.${INTERNAL_NAMESPACE}.svc.cluster.local:6379" \
     --dry-run=client -o yaml | kubectl apply -f -
 
+  ENCRYPTION_PRIVATE_KEY=$(cat /tmp/sp_private.pem)
+  ENCRYPTION_PUBLIC_KEY=$(cat /tmp/sp_public.pem)
+
   rm -f /tmp/sp_private.pem /tmp/sp_public.pem
 
   echo "Backing up non-registry secrets to $SECRETS_BACKUP..."
@@ -399,6 +499,16 @@ JWT_SECRET=$JWT_SECRET
 
 [mfa-secret]
 MFA_SECRET_KEY=$MFA_SECRET_KEY
+
+[fastapi-encryption]
+ENCRYPTION_PUBLIC_KEY<<PUBLIC_KEY
+$ENCRYPTION_PUBLIC_KEY
+PUBLIC_KEY
+
+[fetcher-encryption]
+ENCRYPTION_PRIVATE_KEY<<PRIVATE_KEY
+$ENCRYPTION_PRIVATE_KEY
+PRIVATE_KEY
 
 [redis-credentials]
 REDIS_PASSWORD=$REDIS_PASSWORD
@@ -444,6 +554,7 @@ helm_args=(
   --set-string "fastapi.enableHsts=$CYBERPULSE_ENABLE_HSTS"
   --set "worker.namespace=$INTERNAL_NAMESPACE"
   --set "redis.namespace=$INTERNAL_NAMESPACE"
+  --set "postgres.namespace=$DATA_NAMESPACE"
   --set "cloudflare.tunnel.tokenSecretName=$CLOUDFLARE_TUNNEL_SECRET_NAME"
   --set "cloudflare.tunnel.replicas=$CLOUDFLARE_TUNNEL_REPLICAS"
 )

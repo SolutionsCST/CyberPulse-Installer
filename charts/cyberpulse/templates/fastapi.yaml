@@ -1,3 +1,10 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: fastapi
+  namespace: {{ .Values.fastapi.namespace }}
+automountServiceAccountToken: false
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -18,6 +25,15 @@ spec:
       labels:
         app: fastapi
     spec:
+      serviceAccountName: fastapi
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
       {{- include "cyberpulse.imagePullSecrets" . | nindent 6 }}
       containers:
         - name: fastapi
@@ -26,6 +42,8 @@ spec:
           ports:
             - containerPort: 8000
           env:
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
             - name: CORS_ORIGINS
               value: {{ .Values.fastapi.corsOrigins | quote }}
             - name: ENABLE_HSTS
@@ -49,6 +67,14 @@ spec:
           volumeMounts:
             - name: reports
               mountPath: /data/reports
+            - name: tmp
+              mountPath: /tmp
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
           readinessProbe:
             httpGet:
               path: /health
@@ -65,6 +91,8 @@ spec:
         - name: reports
           persistentVolumeClaim:
             claimName: reports-pvc
+        - name: tmp
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

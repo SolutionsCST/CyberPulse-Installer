@@ -1,3 +1,10 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: worker
+  namespace: {{ .Values.worker.namespace }}
+automountServiceAccountToken: false
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -13,12 +20,23 @@ spec:
       labels:
         app: worker
     spec:
+      serviceAccountName: worker
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
       {{- include "cyberpulse.imagePullSecrets" . | nindent 6 }}
       containers:
         - name: worker
           image: {{ include "cyberpulse.image" (list . "worker") }}
           imagePullPolicy: {{ .Values.images.pullPolicy }}
           env:
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
             - name: REPORTS_DIR
               value: "/data/reports"
             - name: REDIS_URL
@@ -31,11 +49,17 @@ spec:
                 name: postgres-credentials
             - secretRef:
                 name: fetcher-encryption
-            - secretRef:
-                name: jwt-secret
           volumeMounts:
             - name: reports
               mountPath: /data/reports
+            - name: tmp
+              mountPath: /tmp
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
           resources:
             requests:
               memory: {{ .Values.resources.worker.requests.memory | quote }}
@@ -52,3 +76,5 @@ spec:
         - name: reports
           persistentVolumeClaim:
             claimName: reports-pvc
+        - name: tmp
+          emptyDir: {}

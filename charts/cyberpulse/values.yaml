@@ -45,6 +45,9 @@ redis:
   namespace: internal
   image: redis:7-alpine
 
+postgres:
+  namespace: data
+
 reports:
   storage: 5Gi
 
