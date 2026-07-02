@@ -167,25 +167,29 @@ PY
 }
 
 wait_for_postgres() {
-  local pod=""
+  local statefulset=""
   local deadline=$((SECONDS + 180))
 
-  echo "Waiting for PostgreSQL pod..."
+  echo "Waiting for PostgreSQL StatefulSet..."
   while [ "$SECONDS" -lt "$deadline" ]; do
-    pod="$(kubectl get pods -n "$DATA_NAMESPACE" \
+    statefulset="$(kubectl get statefulsets -n "$DATA_NAMESPACE" \
       -l app.kubernetes.io/instance=postgres \
       -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
 
-    if [ -n "$pod" ]; then
-      kubectl wait --for=condition=ready "pod/$pod" -n "$DATA_NAMESPACE" --timeout=180s
+    if [ -n "$statefulset" ]; then
+      kubectl rollout status "statefulset/$statefulset" -n "$DATA_NAMESPACE" --timeout=180s
+      kubectl wait --for=condition=ready pod \
+        -l app.kubernetes.io/instance=postgres \
+        -n "$DATA_NAMESPACE" \
+        --timeout=180s
       return
     fi
 
     sleep 2
   done
 
-  echo "Timed out waiting for PostgreSQL pod to be created." >&2
-  kubectl get pods -n "$DATA_NAMESPACE" >&2 || true
+  echo "Timed out waiting for PostgreSQL StatefulSet to be created." >&2
+  kubectl get statefulsets,pods -n "$DATA_NAMESPACE" >&2 || true
   exit 1
 }
 
