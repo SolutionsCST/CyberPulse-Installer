@@ -50,6 +50,12 @@ spec:
               value: {{ .Values.fastapi.enableHsts | quote }}
             - name: ENABLE_API_DOCS
               value: {{ .Values.fastapi.enableApiDocs | quote }}
+            - name: AUTH_COOKIE_SECURE
+              value: {{ .Values.fastapi.authCookieSecure | quote }}
+            - name: AUTH_COOKIE_SAMESITE
+              value: {{ .Values.fastapi.authCookieSameSite | quote }}
+            - name: CSRF_ENABLED
+              value: {{ .Values.fastapi.csrfEnabled | quote }}
             - name: REDIS_URL
               valueFrom:
                 secretKeyRef:

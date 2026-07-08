@@ -16,6 +16,7 @@ ACCESS_MODE="${CYBERPULSE_ACCESS_MODE:-}"
 CYBERPULSE_PUBLIC_URL="${CYBERPULSE_PUBLIC_URL:-}"
 CYBERPULSE_CORS_ORIGINS="${CYBERPULSE_CORS_ORIGINS:-}"
 CYBERPULSE_ENABLE_HSTS="${CYBERPULSE_ENABLE_HSTS:-}"
+CYBERPULSE_AUTH_COOKIE_SECURE="${CYBERPULSE_AUTH_COOKIE_SECURE:-}"
 CLOUDFLARE_TUNNEL_TOKEN="${CLOUDFLARE_TUNNEL_TOKEN:-}"
 CLOUDFLARE_TUNNEL_SECRET_NAME="${CLOUDFLARE_TUNNEL_SECRET_NAME:-cloudflare-tunnel-token}"
 CLOUDFLARE_TUNNEL_REPLICAS="${CLOUDFLARE_TUNNEL_REPLICAS:-2}"
@@ -375,6 +376,14 @@ if [ -z "$CYBERPULSE_ENABLE_HSTS" ]; then
   fi
 fi
 
+if [ -z "$CYBERPULSE_AUTH_COOKIE_SECURE" ]; then
+  if [[ "$CYBERPULSE_PUBLIC_URL" == https://* ]]; then
+    CYBERPULSE_AUTH_COOKIE_SECURE="true"
+  else
+    CYBERPULSE_AUTH_COOKIE_SECURE="false"
+  fi
+fi
+
 CYBERPULSE_CORS_ORIGINS_HELM="$(helm_set_escape "$CYBERPULSE_CORS_ORIGINS")"
 
 echo "=== CyberPulse production install/update ==="
@@ -388,6 +397,7 @@ if [ -n "$CYBERPULSE_PUBLIC_URL" ]; then
 fi
 echo "CORS origins: $CYBERPULSE_CORS_ORIGINS"
 echo "HSTS enabled: $CYBERPULSE_ENABLE_HSTS"
+echo "Secure auth cookies: $CYBERPULSE_AUTH_COOKIE_SECURE"
 
 echo ""
 echo "=== Setting up Helm repos ==="
@@ -556,6 +566,7 @@ helm_args=(
   --set "fastapi.namespace=$INTERNAL_NAMESPACE"
   --set-string "fastapi.corsOrigins=$CYBERPULSE_CORS_ORIGINS_HELM"
   --set-string "fastapi.enableHsts=$CYBERPULSE_ENABLE_HSTS"
+  --set-string "fastapi.authCookieSecure=$CYBERPULSE_AUTH_COOKIE_SECURE"
   --set "worker.namespace=$INTERNAL_NAMESPACE"
   --set "redis.namespace=$INTERNAL_NAMESPACE"
   --set "postgres.namespace=$DATA_NAMESPACE"

@@ -36,6 +36,9 @@ fastapi:
   corsOrigins: "http://localhost:3000,http://localhost:80"
   enableHsts: "false"
   enableApiDocs: "false"
+  authCookieSecure: "true"
+  authCookieSameSite: "lax"
+  csrfEnabled: "true"
 
 worker:
   namespace: internal
