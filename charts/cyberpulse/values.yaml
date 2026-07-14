@@ -42,7 +42,7 @@ fastapi:
 
 worker:
   namespace: internal
-  replicas: 1
+  replicas: 3
 
 redis:
   namespace: internal
