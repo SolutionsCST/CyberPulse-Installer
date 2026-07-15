@@ -70,8 +70,10 @@ spec:
           livenessProbe:
             exec:
               command: ["arq", "--check", "worker.settings.WorkerSettings"]
-            initialDelaySeconds: 30
-            periodSeconds: 30
+            initialDelaySeconds: 90
+            periodSeconds: 60
+            timeoutSeconds: 10
+            failureThreshold: 5
       volumes:
         - name: reports
           persistentVolumeClaim:
@@ -142,8 +144,10 @@ spec:
           livenessProbe:
             exec:
               command: ["arq", "--check", "worker.settings.VulnerabilityWorkerSettings"]
-            initialDelaySeconds: 30
-            periodSeconds: 30
+            initialDelaySeconds: 90
+            periodSeconds: 60
+            timeoutSeconds: 10
+            failureThreshold: 5
       volumes:
         - name: tmp
           emptyDir: {}
