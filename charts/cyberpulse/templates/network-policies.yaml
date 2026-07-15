@@ -11,6 +11,7 @@ spec:
         values:
           - fastapi
           - worker
+          - vulnerability-worker
           - redis
   policyTypes:
     - Ingress
@@ -59,6 +60,7 @@ spec:
                 values:
                   - fastapi
                   - worker
+                  - vulnerability-worker
       ports:
         - protocol: TCP
           port: 6379
@@ -76,6 +78,7 @@ spec:
         values:
           - fastapi
           - worker
+          - vulnerability-worker
   policyTypes:
     - Egress
   egress:
@@ -110,8 +113,12 @@ metadata:
   namespace: {{ .Values.worker.namespace }}
 spec:
   podSelector:
-    matchLabels:
-      app: worker
+    matchExpressions:
+      - key: app
+        operator: In
+        values:
+          - worker
+          - vulnerability-worker
   policyTypes:
     - Egress
   egress:

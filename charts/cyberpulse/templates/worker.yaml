@@ -78,3 +78,72 @@ spec:
             claimName: reports-pvc
         - name: tmp
           emptyDir: {}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vulnerability-worker
+  namespace: {{ .Values.worker.namespace }}
+spec:
+  replicas: {{ .Values.worker.vulnerabilities.replicas }}
+  selector:
+    matchLabels:
+      app: vulnerability-worker
+  template:
+    metadata:
+      labels:
+        app: vulnerability-worker
+    spec:
+      serviceAccountName: worker
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      {{- include "cyberpulse.imagePullSecrets" . | nindent 6 }}
+      containers:
+        - name: vulnerability-worker
+          image: {{ include "cyberpulse.image" (list . "worker") }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          command: ["arq", "worker.settings.VulnerabilityWorkerSettings"]
+          env:
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: redis-credentials
+                  key: REDIS_URL
+          envFrom:
+            - secretRef:
+                name: postgres-credentials
+            - secretRef:
+                name: fetcher-encryption
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              memory: {{ .Values.resources.vulnerabilityWorker.requests.memory | quote }}
+              cpu: {{ .Values.resources.vulnerabilityWorker.requests.cpu | quote }}
+            limits:
+              memory: {{ .Values.resources.vulnerabilityWorker.limits.memory | quote }}
+              cpu: {{ .Values.resources.vulnerabilityWorker.limits.cpu | quote }}
+          livenessProbe:
+            exec:
+              command: ["arq", "--check", "worker.settings.VulnerabilityWorkerSettings"]
+            initialDelaySeconds: 30
+            periodSeconds: 30
+      volumes:
+        - name: tmp
+          emptyDir: {}
