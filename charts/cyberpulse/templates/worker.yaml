@@ -67,13 +67,6 @@ spec:
             limits:
               memory: {{ .Values.resources.worker.limits.memory | quote }}
               cpu: {{ .Values.resources.worker.limits.cpu | quote }}
-          livenessProbe:
-            exec:
-              command: ["arq", "--check", "worker.settings.WorkerSettings"]
-            initialDelaySeconds: 90
-            periodSeconds: 60
-            timeoutSeconds: 10
-            failureThreshold: 5
       volumes:
         - name: reports
           persistentVolumeClaim:
@@ -141,13 +134,6 @@ spec:
             limits:
               memory: {{ .Values.resources.vulnerabilityWorker.limits.memory | quote }}
               cpu: {{ .Values.resources.vulnerabilityWorker.limits.cpu | quote }}
-          livenessProbe:
-            exec:
-              command: ["arq", "--check", "worker.settings.VulnerabilityWorkerSettings"]
-            initialDelaySeconds: 90
-            periodSeconds: 60
-            timeoutSeconds: 10
-            failureThreshold: 5
       volumes:
         - name: tmp
           emptyDir: {}
