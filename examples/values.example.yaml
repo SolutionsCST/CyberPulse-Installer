@@ -7,8 +7,11 @@ fastapi:
   enableHsts: "true"
   enableApiDocs: "false"
   kubernetesApiEgress:
-    # Default k3s Kubernetes service IP. Change if the cluster service CIDR differs.
+    # Default k3s Kubernetes service IP. install.sh also auto-adds the real
+    # Kubernetes API EndpointSlice target, such as 192.168.x.x:6443.
     cidr: 10.43.0.1/32
+    port: 443
+    endpoints: []
 
 reports:
   storage: 20Gi

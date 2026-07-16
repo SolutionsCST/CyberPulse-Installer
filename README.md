@@ -125,9 +125,20 @@ fastapi:
   kubernetesApiEgress:
     enabled: true
     cidr: 10.43.0.1/32
+    port: 443
 ```
 
-If your cluster uses a different Kubernetes service IP, override `fastapi.kubernetesApiEgress.cidr` in your values file.
+During `install.sh`, the installer also discovers the real Kubernetes API EndpointSlice target and adds it as an additional egress rule, for example `192.168.70.2/32` on port `6443`. This is needed on clusters where egress policy is enforced after service translation.
+
+If your cluster uses a different Kubernetes service IP, override `fastapi.kubernetesApiEgress.cidr` in your values file. You can also provide static endpoint rules:
+
+```yaml
+fastapi:
+  kubernetesApiEgress:
+    endpoints:
+      - cidr: 192.168.70.2/32
+        port: 6443
+```
 
 ### None
 

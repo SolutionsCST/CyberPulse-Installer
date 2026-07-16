@@ -42,6 +42,8 @@ fastapi:
   kubernetesApiEgress:
     enabled: true
     cidr: 10.43.0.1/32
+    port: 443
+    endpoints: []
 
 worker:
   namespace: internal

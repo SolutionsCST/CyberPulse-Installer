@@ -101,6 +101,45 @@ helm_set_escape() {
   printf '%s' "$value"
 }
 
+kubernetes_api_endpoint_args() {
+  local endpoints_json
+
+  endpoints_json="$(kubectl get endpointslices -n default \
+    -l kubernetes.io/service-name=kubernetes \
+    -o json 2>/dev/null || true)"
+
+  if [ -z "$endpoints_json" ]; then
+    return
+  fi
+
+  ENDPOINTS_JSON="$endpoints_json" python3 - <<'PY'
+import ipaddress
+import json
+import os
+
+payload = json.loads(os.environ["ENDPOINTS_JSON"])
+seen = set()
+index = 0
+
+for item in payload.get("items", []):
+    ports = [port.get("port") for port in item.get("ports", []) if port.get("port")]
+    for endpoint in item.get("endpoints", []):
+        for address in endpoint.get("addresses", []):
+            try:
+                ipaddress.ip_address(address)
+            except ValueError:
+                continue
+            for port in ports:
+                key = (address, port)
+                if key in seen:
+                    continue
+                seen.add(key)
+                print(f"--set-string=fastapi.kubernetesApiEgress.endpoints[{index}].cidr={address}/32")
+                print(f"--set=fastapi.kubernetesApiEgress.endpoints[{index}].port={port}")
+                index += 1
+PY
+}
+
 create_pull_secret() {
   local namespace="$1"
 
@@ -389,6 +428,7 @@ if [ -z "$CYBERPULSE_AUTH_COOKIE_SECURE" ]; then
 fi
 
 CYBERPULSE_CORS_ORIGINS_HELM="$(helm_set_escape "$CYBERPULSE_CORS_ORIGINS")"
+mapfile -t KUBERNETES_API_ENDPOINT_HELM_ARGS < <(kubernetes_api_endpoint_args)
 
 echo "=== CyberPulse production install/update ==="
 echo "Release: $RELEASE_NAME"
@@ -402,6 +442,11 @@ fi
 echo "CORS origins: $CYBERPULSE_CORS_ORIGINS"
 echo "HSTS enabled: $CYBERPULSE_ENABLE_HSTS"
 echo "Secure auth cookies: $CYBERPULSE_AUTH_COOKIE_SECURE"
+if [ "${#KUBERNETES_API_ENDPOINT_HELM_ARGS[@]}" -gt 0 ]; then
+  echo "Kubernetes API endpoints: detected"
+else
+  echo "Kubernetes API endpoints: none detected, using service CIDR only"
+fi
 
 echo ""
 echo "=== Setting up Helm repos ==="
@@ -577,6 +622,8 @@ helm_args=(
   --set "cloudflare.tunnel.tokenSecretName=$CLOUDFLARE_TUNNEL_SECRET_NAME"
   --set "cloudflare.tunnel.replicas=$CLOUDFLARE_TUNNEL_REPLICAS"
 )
+
+helm_args+=("${KUBERNETES_API_ENDPOINT_HELM_ARGS[@]}")
 
 case "$ACCESS_MODE" in
   traefik)
