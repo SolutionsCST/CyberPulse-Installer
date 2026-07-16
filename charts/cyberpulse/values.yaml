@@ -39,6 +39,9 @@ fastapi:
   authCookieSecure: "true"
   authCookieSameSite: "lax"
   csrfEnabled: "true"
+  kubernetesApiEgress:
+    enabled: true
+    cidr: 10.43.0.1/32
 
 worker:
   namespace: internal

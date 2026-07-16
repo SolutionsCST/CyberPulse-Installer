@@ -219,6 +219,8 @@ adopt_existing_cyberpulse_resources() {
   adopt_resource_if_present "$INTERNAL_NAMESPACE" deployment fastapi
   adopt_resource_if_present "$INTERNAL_NAMESPACE" service fastapi
   adopt_resource_if_present "$INTERNAL_NAMESPACE" serviceaccount fastapi
+  adopt_resource_if_present "$INTERNAL_NAMESPACE" role fastapi-readonly-workload-observer
+  adopt_resource_if_present "$INTERNAL_NAMESPACE" rolebinding fastapi-readonly-workload-observer
   adopt_resource_if_present "$INTERNAL_NAMESPACE" deployment worker
   adopt_resource_if_present "$INTERNAL_NAMESPACE" deployment vulnerability-worker
   adopt_resource_if_present "$INTERNAL_NAMESPACE" serviceaccount worker
@@ -229,6 +231,7 @@ adopt_existing_cyberpulse_resources() {
   adopt_resource_if_present "$INTERNAL_NAMESPACE" networkpolicy fastapi-ingress
   adopt_resource_if_present "$INTERNAL_NAMESPACE" networkpolicy redis-ingress
   adopt_resource_if_present "$INTERNAL_NAMESPACE" networkpolicy app-egress
+  adopt_resource_if_present "$INTERNAL_NAMESPACE" networkpolicy fastapi-kube-api-egress
   adopt_resource_if_present "$INTERNAL_NAMESPACE" networkpolicy worker-vendor-egress
 }
 

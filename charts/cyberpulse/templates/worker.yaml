@@ -67,6 +67,20 @@ spec:
             limits:
               memory: {{ .Values.resources.worker.limits.memory | quote }}
               cpu: {{ .Values.resources.worker.limits.cpu | quote }}
+          readinessProbe:
+            exec:
+              command: ["python", "-c", "import os, redis; redis.from_url(os.environ['REDIS_URL']).ping()"]
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            exec:
+              command: ["python", "-c", "import os, redis; redis.from_url(os.environ['REDIS_URL']).ping()"]
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
       volumes:
         - name: reports
           persistentVolumeClaim:
@@ -134,6 +148,20 @@ spec:
             limits:
               memory: {{ .Values.resources.vulnerabilityWorker.limits.memory | quote }}
               cpu: {{ .Values.resources.vulnerabilityWorker.limits.cpu | quote }}
+          readinessProbe:
+            exec:
+              command: ["python", "-c", "import os, redis; redis.from_url(os.environ['REDIS_URL']).ping()"]
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            exec:
+              command: ["python", "-c", "import os, redis; redis.from_url(os.environ['REDIS_URL']).ping()"]
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
       volumes:
         - name: tmp
           emptyDir: {}

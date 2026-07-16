@@ -6,6 +6,9 @@ fastapi:
   corsOrigins: "https://pulse.customer.example"
   enableHsts: "true"
   enableApiDocs: "false"
+  kubernetesApiEgress:
+    # Default k3s Kubernetes service IP. Change if the cluster service CIDR differs.
+    cidr: 10.43.0.1/32
 
 reports:
   storage: 20Gi

@@ -114,6 +114,21 @@ The public URL is prepended to FastAPI CORS origins. Override the full list if n
 CYBERPULSE_CORS_ORIGINS='https://customer.cyberpulse.ca,http://localhost:3000' ./install.sh
 ```
 
+### Worker Observability
+
+FastAPI has read-only Kubernetes access so Global Admins can view worker pod and deployment health in the Workers tab. The chart grants only `get`/`list` on pods and deployments in the internal namespace; it does not grant pod logs, exec, secrets, or write verbs.
+
+The chart also allows FastAPI egress to the Kubernetes API service. The default CIDR is the k3s Kubernetes service IP:
+
+```yaml
+fastapi:
+  kubernetesApiEgress:
+    enabled: true
+    cidr: 10.43.0.1/32
+```
+
+If your cluster uses a different Kubernetes service IP, override `fastapi.kubernetesApiEgress.cidr` in your values file.
+
 ### None
 
 `none` disables both Traefik Ingress and Cloudflare Tunnel. Use this for fully private installs or custom networking.
