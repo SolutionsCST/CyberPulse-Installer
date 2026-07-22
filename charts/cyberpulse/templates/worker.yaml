@@ -165,3 +165,81 @@ spec:
       volumes:
         - name: tmp
           emptyDir: {}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: audit-forwarder
+  namespace: {{ .Values.worker.namespace }}
+spec:
+  replicas: {{ .Values.worker.auditForwarder.replicas }}
+  selector:
+    matchLabels:
+      app: audit-forwarder
+  template:
+    metadata:
+      labels:
+        app: audit-forwarder
+    spec:
+      serviceAccountName: worker
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      {{- include "cyberpulse.imagePullSecrets" . | nindent 6 }}
+      containers:
+        - name: audit-forwarder
+          image: {{ include "cyberpulse.image" (list . "worker") }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          command: ["arq", "worker.settings.AuditForwarderWorkerSettings"]
+          env:
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: redis-credentials
+                  key: REDIS_URL
+          envFrom:
+            - secretRef:
+                name: postgres-credentials
+            - secretRef:
+                name: fetcher-encryption
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              memory: {{ .Values.resources.auditForwarder.requests.memory | quote }}
+              cpu: {{ .Values.resources.auditForwarder.requests.cpu | quote }}
+            limits:
+              memory: {{ .Values.resources.auditForwarder.limits.memory | quote }}
+              cpu: {{ .Values.resources.auditForwarder.limits.cpu | quote }}
+          readinessProbe:
+            exec:
+              command: ["python", "-c", "import os, redis; redis.from_url(os.environ['REDIS_URL']).ping()"]
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            exec:
+              command: ["python", "-c", "import os, redis; redis.from_url(os.environ['REDIS_URL']).ping()"]
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+      volumes:
+        - name: tmp
+          emptyDir: {}

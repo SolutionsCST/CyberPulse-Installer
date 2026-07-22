@@ -50,6 +50,8 @@ worker:
   replicas: 3
   vulnerabilities:
     replicas: 1
+  auditForwarder:
+    replicas: 1
 
 redis:
   namespace: internal
@@ -83,3 +85,10 @@ resources:
     limits:
       cpu: 1000m
       memory: 2Gi
+  auditForwarder:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
