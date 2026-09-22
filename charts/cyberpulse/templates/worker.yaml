@@ -170,17 +170,17 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: audit-forwarder
+  name: system
   namespace: {{ .Values.worker.namespace }}
 spec:
-  replicas: {{ .Values.worker.auditForwarder.replicas }}
+  replicas: {{ .Values.worker.system.replicas }}
   selector:
     matchLabels:
-      app: audit-forwarder
+      app: system
   template:
     metadata:
       labels:
-        app: audit-forwarder
+        app: system
     spec:
       serviceAccountName: worker
       automountServiceAccountToken: false
@@ -193,13 +193,15 @@ spec:
           type: RuntimeDefault
       {{- include "cyberpulse.imagePullSecrets" . | nindent 6 }}
       containers:
-        - name: audit-forwarder
+        - name: system
           image: {{ include "cyberpulse.image" (list . "worker") }}
           imagePullPolicy: {{ .Values.images.pullPolicy }}
-          command: ["arq", "worker.settings.AuditForwarderWorkerSettings"]
+          command: ["arq", "worker.settings.SystemWorkerSettings"]
           env:
             - name: PYTHONDONTWRITEBYTECODE
               value: "1"
+            - name: REPORTS_DIR
+              value: "/data/reports"
             - name: REDIS_URL
               valueFrom:
                 secretKeyRef:
@@ -211,6 +213,8 @@ spec:
             - secretRef:
                 name: fetcher-encryption
           volumeMounts:
+            - name: reports
+              mountPath: /data/reports
             - name: tmp
               mountPath: /tmp
           securityContext:
@@ -221,11 +225,11 @@ spec:
                 - ALL
           resources:
             requests:
-              memory: {{ .Values.resources.auditForwarder.requests.memory | quote }}
-              cpu: {{ .Values.resources.auditForwarder.requests.cpu | quote }}
+              memory: {{ .Values.resources.system.requests.memory | quote }}
+              cpu: {{ .Values.resources.system.requests.cpu | quote }}
             limits:
-              memory: {{ .Values.resources.auditForwarder.limits.memory | quote }}
-              cpu: {{ .Values.resources.auditForwarder.limits.cpu | quote }}
+              memory: {{ .Values.resources.system.limits.memory | quote }}
+              cpu: {{ .Values.resources.system.limits.cpu | quote }}
           readinessProbe:
             exec:
               command: ["python", "-c", "import os, redis; redis.from_url(os.environ['REDIS_URL']).ping()"]
@@ -241,5 +245,8 @@ spec:
             timeoutSeconds: 5
             failureThreshold: 3
       volumes:
+        - name: reports
+          persistentVolumeClaim:
+            claimName: reports-pvc
         - name: tmp
           emptyDir: {}

@@ -47,10 +47,10 @@ fastapi:
 
 worker:
   namespace: internal
-  replicas: 3
+  replicas: 6
   vulnerabilities:
     replicas: 1
-  auditForwarder:
+  system:
     replicas: 1
 
 redis:
@@ -85,10 +85,10 @@ resources:
     limits:
       cpu: 1000m
       memory: 2Gi
-  auditForwarder:
+  system:
     requests:
-      cpu: 100m
-      memory: 128Mi
+      cpu: 200m
+      memory: 256Mi
     limits:
-      cpu: 500m
-      memory: 512Mi
+      cpu: 1000m
+      memory: 1Gi

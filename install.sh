@@ -262,6 +262,7 @@ adopt_existing_cyberpulse_resources() {
   adopt_resource_if_present "$INTERNAL_NAMESPACE" rolebinding fastapi-readonly-workload-observer
   adopt_resource_if_present "$INTERNAL_NAMESPACE" deployment worker
   adopt_resource_if_present "$INTERNAL_NAMESPACE" deployment vulnerability-worker
+  adopt_resource_if_present "$INTERNAL_NAMESPACE" deployment system
   adopt_resource_if_present "$INTERNAL_NAMESPACE" serviceaccount worker
   adopt_resource_if_present "$INTERNAL_NAMESPACE" deployment redis
   adopt_resource_if_present "$INTERNAL_NAMESPACE" service redis
@@ -603,6 +604,7 @@ fi
 echo ""
 echo "=== Deploying CyberPulse chart ==="
 adopt_existing_cyberpulse_resources
+kubectl delete deployment audit-forwarder -n "$INTERNAL_NAMESPACE" --ignore-not-found
 
 helm_args=(
   upgrade --install "$RELEASE_NAME" "$CHART_DIR"
@@ -649,6 +651,7 @@ kubectl rollout status deployment webapp -n "$WEBAPP_NAMESPACE" --timeout=120s
 kubectl rollout status deployment fastapi -n "$INTERNAL_NAMESPACE" --timeout=120s
 kubectl rollout status deployment worker -n "$INTERNAL_NAMESPACE" --timeout=120s
 kubectl rollout status deployment vulnerability-worker -n "$INTERNAL_NAMESPACE" --timeout=120s
+kubectl rollout status deployment system -n "$INTERNAL_NAMESPACE" --timeout=120s
 if [ "$ACCESS_MODE" = "cloudflare" ]; then
   kubectl rollout status deployment cloudflared -n "$WEBAPP_NAMESPACE" --timeout=120s
 fi

@@ -12,7 +12,7 @@ spec:
           - fastapi
           - worker
           - vulnerability-worker
-          - audit-forwarder
+          - system
           - redis
   policyTypes:
     - Ingress
@@ -62,7 +62,7 @@ spec:
                   - fastapi
                   - worker
                   - vulnerability-worker
-                  - audit-forwarder
+                  - system
       ports:
         - protocol: TCP
           port: 6379
@@ -81,7 +81,7 @@ spec:
           - fastapi
           - worker
           - vulnerability-worker
-          - audit-forwarder
+          - system
   policyTypes:
     - Egress
   egress:
@@ -151,7 +151,7 @@ spec:
         values:
           - worker
           - vulnerability-worker
-          - audit-forwarder
+          - system
   policyTypes:
     - Egress
   egress:
@@ -163,3 +163,5 @@ spec:
           port: 443
         - protocol: TCP
           port: 587
+        - protocol: TCP
+          port: 465
