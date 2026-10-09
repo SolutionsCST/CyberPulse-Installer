@@ -66,7 +66,7 @@ remove_docker_images() {
   fi
 
   docker images --format '{{.Repository}}:{{.Tag}}' \
-    | grep -E '(^|/)cyberpulse-(webapp|fastapi|worker):|^cloudflare/cloudflared:' \
+    | grep -E '(^|/)cyberpulse-(webapp|docs|fastapi|worker):|^cloudflare/cloudflared:' \
     | sort -u \
     | xargs -r docker rmi 2>/dev/null || true
 
@@ -95,9 +95,11 @@ delete_namespace_and_wait "$DATA_NAMESPACE"
 echo ""
 echo "=== Cleaning local CyberPulse images ==="
 remove_containerd_image "$IMAGE_PREFIX/cyberpulse-webapp:latest"
+remove_containerd_image "$IMAGE_PREFIX/cyberpulse-docs:latest"
 remove_containerd_image "$IMAGE_PREFIX/cyberpulse-fastapi:latest"
 remove_containerd_image "$IMAGE_PREFIX/cyberpulse-worker:latest"
 remove_containerd_image "docker.io/library/cyberpulse-webapp:latest"
+remove_containerd_image "docker.io/library/cyberpulse-docs:latest"
 remove_containerd_image "docker.io/library/cyberpulse-fastapi:latest"
 remove_containerd_image "docker.io/library/cyberpulse-worker:latest"
 remove_containerd_image "$CLOUDFLARED_IMAGE"

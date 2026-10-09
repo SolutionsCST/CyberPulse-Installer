@@ -254,6 +254,8 @@ adopt_resource_if_present() {
 adopt_existing_cyberpulse_resources() {
   adopt_resource_if_present "$WEBAPP_NAMESPACE" deployment webapp
   adopt_resource_if_present "$WEBAPP_NAMESPACE" service webapp
+  adopt_resource_if_present "$WEBAPP_NAMESPACE" deployment docs
+  adopt_resource_if_present "$WEBAPP_NAMESPACE" service docs
 
   adopt_resource_if_present "$INTERNAL_NAMESPACE" deployment fastapi
   adopt_resource_if_present "$INTERNAL_NAMESPACE" service fastapi
@@ -614,6 +616,7 @@ helm_args=(
   --set "images.pullPolicy=$IMAGE_PULL_POLICY"
   --set "imagePullSecrets[0].name=$PULL_SECRET_NAME"
   --set "webapp.namespace=$WEBAPP_NAMESPACE"
+  --set "docs.namespace=$WEBAPP_NAMESPACE"
   --set "fastapi.namespace=$INTERNAL_NAMESPACE"
   --set-string "fastapi.corsOrigins=$CYBERPULSE_CORS_ORIGINS_HELM"
   --set-string "fastapi.enableHsts=$CYBERPULSE_ENABLE_HSTS"
@@ -647,6 +650,7 @@ helm "${helm_args[@]}"
 
 echo ""
 echo "=== Waiting for rollout ==="
+kubectl rollout status deployment docs -n "$WEBAPP_NAMESPACE" --timeout=120s
 kubectl rollout status deployment webapp -n "$WEBAPP_NAMESPACE" --timeout=120s
 kubectl rollout status deployment fastapi -n "$INTERNAL_NAMESPACE" --timeout=120s
 kubectl rollout status deployment worker -n "$INTERNAL_NAMESPACE" --timeout=120s

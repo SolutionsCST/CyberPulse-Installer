@@ -2,6 +2,9 @@ images:
   prefix: ghcr.io/solutionscst
   tag: v1.2.0
 
+docs:
+  replicas: 1
+
 fastapi:
   corsOrigins: "https://pulse.customer.example"
   enableHsts: "true"

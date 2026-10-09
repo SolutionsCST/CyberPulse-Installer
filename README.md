@@ -55,7 +55,7 @@ The installer:
 3. Creates GHCR image pull secrets in the app namespaces.
 4. Generates application secrets on first install.
 5. Runs `helm upgrade --install` for the CyberPulse chart.
-6. Waits for the webapp, FastAPI, worker, and vulnerability-worker rollouts.
+6. Waits for the documentation, webapp, FastAPI, and worker rollouts.
 
 Generated application secrets are backed up to `secrets/prod-secrets.yaml` on first install. To back up existing live application secrets from Kubernetes, run `./install.sh --dump-credentials`. This includes the RSA integration-secret encryption keypair and the independent `mfa-secret` used by FastAPI to encrypt authenticator-app TOTP seeds. Keep this backup safe; losing the RSA private key makes existing encrypted integration secrets unrecoverable. GHCR credentials are stored only as Kubernetes image pull secrets.
 
@@ -71,7 +71,7 @@ The installer supports three access modes.
 http://<server-ip>/
 ```
 
-Only the webapp is exposed. FastAPI remains internal and is reached through the webapp container's `/api/` nginx proxy. PostgreSQL and Redis remain internal-only.
+Only the webapp is exposed. The authenticated documentation service is reached through the webapp at `/docs/`; FastAPI is reached through the webapp container's `/api/` nginx proxy. PostgreSQL and Redis remain internal-only.
 
 ```bash
 CYBERPULSE_IMAGE_TAG=v1.2.0 \

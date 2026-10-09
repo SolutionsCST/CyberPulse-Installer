@@ -7,12 +7,18 @@ images:
   pullPolicy: Always
   webapp:
     repository: cyberpulse-webapp
+  docs:
+    repository: cyberpulse-docs
   fastapi:
     repository: cyberpulse-fastapi
   worker:
     repository: cyberpulse-worker
 
 webapp:
+  namespace: dmz
+  replicas: 1
+
+docs:
   namespace: dmz
   replicas: 1
 
