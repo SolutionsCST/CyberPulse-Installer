@@ -79,6 +79,8 @@ spec:
           env:
             - name: PYTHONDONTWRITEBYTECODE
               value: "1"
+            - name: CYBERPULSE_ENV
+              value: {{ .Values.runtime.environment | quote }}
             - name: CORS_ORIGINS
               value: {{ .Values.fastapi.corsOrigins | quote }}
             - name: ENABLE_HSTS

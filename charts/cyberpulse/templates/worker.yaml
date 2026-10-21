@@ -37,6 +37,8 @@ spec:
           env:
             - name: PYTHONDONTWRITEBYTECODE
               value: "1"
+            - name: CYBERPULSE_ENV
+              value: {{ .Values.runtime.environment | quote }}
             - name: REPORTS_DIR
               value: "/data/reports"
             - name: REDIS_URL
@@ -122,6 +124,8 @@ spec:
           env:
             - name: PYTHONDONTWRITEBYTECODE
               value: "1"
+            - name: CYBERPULSE_ENV
+              value: {{ .Values.runtime.environment | quote }}
             - name: REDIS_URL
               valueFrom:
                 secretKeyRef:
@@ -200,6 +204,8 @@ spec:
           env:
             - name: PYTHONDONTWRITEBYTECODE
               value: "1"
+            - name: CYBERPULSE_ENV
+              value: {{ .Values.runtime.environment | quote }}
             - name: REPORTS_DIR
               value: "/data/reports"
             - name: REDIS_URL

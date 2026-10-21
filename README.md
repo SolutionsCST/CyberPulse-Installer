@@ -46,6 +46,12 @@ CYBERPULSE_VALUES_FILE=examples/values.example.yaml \
 ./install.sh
 ```
 
+The runtime defaults to production when `CYBERPULSE_ENV` is unset. Development mode is intended only for isolated local testing because it enables unsafe conveniences such as authentication bypass controls and dummy integrations. If it is explicitly requested, the installer requires an interactive confirmation before continuing:
+
+```bash
+CYBERPULSE_ENV=development ./install.sh
+```
+
 ## What It Does
 
 The installer:

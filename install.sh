@@ -17,6 +17,7 @@ CYBERPULSE_PUBLIC_URL="${CYBERPULSE_PUBLIC_URL:-}"
 CYBERPULSE_CORS_ORIGINS="${CYBERPULSE_CORS_ORIGINS:-}"
 CYBERPULSE_ENABLE_HSTS="${CYBERPULSE_ENABLE_HSTS:-}"
 CYBERPULSE_AUTH_COOKIE_SECURE="${CYBERPULSE_AUTH_COOKIE_SECURE:-}"
+CYBERPULSE_ENV="${CYBERPULSE_ENV:-production}"
 CLOUDFLARE_TUNNEL_TOKEN="${CLOUDFLARE_TUNNEL_TOKEN:-}"
 CLOUDFLARE_TUNNEL_SECRET_NAME="${CLOUDFLARE_TUNNEL_SECRET_NAME:-cloudflare-tunnel-token}"
 CLOUDFLARE_TUNNEL_REPLICAS="${CLOUDFLARE_TUNNEL_REPLICAS:-2}"
@@ -92,6 +93,41 @@ prompt_optional() {
   fi
 
   printf -v "$var_name" '%s' "$value"
+}
+
+confirm_runtime_environment() {
+  local normalized_environment
+  local confirmation=""
+
+  normalized_environment="$(printf '%s' "$CYBERPULSE_ENV" | tr '[:upper:]' '[:lower:]')"
+  case "$normalized_environment" in
+    production|prod)
+      CYBERPULSE_ENV="production"
+      ;;
+    development|dev|local)
+      CYBERPULSE_ENV="development"
+      echo "" >&2
+      echo "WARNING: CyberPulse development mode is enabled." >&2
+      echo "Development mode exposes unsafe conveniences, including authentication bypass controls and dummy integrations." >&2
+      echo "Do not use development mode for a production environment." >&2
+      echo "" >&2
+      if ! read -r -p "Type development to continue: " confirmation; then
+        echo "Unable to read confirmation; installation aborted." >&2
+        exit 1
+      fi
+      if [ "$confirmation" != "development" ]; then
+        echo "Development-mode installation aborted." >&2
+        exit 1
+      fi
+      ;;
+    *)
+      echo "Invalid CYBERPULSE_ENV: $CYBERPULSE_ENV" >&2
+      echo "Expected production, prod, development, dev, or local." >&2
+      exit 1
+      ;;
+  esac
+
+  export CYBERPULSE_ENV
 }
 
 helm_set_escape() {
@@ -360,6 +396,8 @@ if [ "$MODE" = "dump-credentials" ]; then
   exit 0
 fi
 
+confirm_runtime_environment
+
 require_command helm
 require_command python3
 
@@ -433,8 +471,9 @@ fi
 CYBERPULSE_CORS_ORIGINS_HELM="$(helm_set_escape "$CYBERPULSE_CORS_ORIGINS")"
 mapfile -t KUBERNETES_API_ENDPOINT_HELM_ARGS < <(kubernetes_api_endpoint_args)
 
-echo "=== CyberPulse production install/update ==="
+echo "=== CyberPulse install/update ==="
 echo "Release: $RELEASE_NAME"
+echo "Runtime environment: $CYBERPULSE_ENV"
 echo "Image prefix: $IMAGE_PREFIX"
 echo "Image tag: $IMAGE_TAG"
 echo "Pull policy: $IMAGE_PULL_POLICY"
@@ -618,6 +657,7 @@ helm_args=(
   --set "webapp.namespace=$WEBAPP_NAMESPACE"
   --set "docs.namespace=$WEBAPP_NAMESPACE"
   --set "fastapi.namespace=$INTERNAL_NAMESPACE"
+  --set-string "runtime.environment=$CYBERPULSE_ENV"
   --set-string "fastapi.corsOrigins=$CYBERPULSE_CORS_ORIGINS_HELM"
   --set-string "fastapi.enableHsts=$CYBERPULSE_ENABLE_HSTS"
   --set-string "fastapi.authCookieSecure=$CYBERPULSE_AUTH_COOKIE_SECURE"
