@@ -21,6 +21,8 @@ CYBERPULSE_ENV="${CYBERPULSE_ENV:-production}"
 CLOUDFLARE_TUNNEL_TOKEN="${CLOUDFLARE_TUNNEL_TOKEN:-}"
 CLOUDFLARE_TUNNEL_SECRET_NAME="${CLOUDFLARE_TUNNEL_SECRET_NAME:-cloudflare-tunnel-token}"
 CLOUDFLARE_TUNNEL_REPLICAS="${CLOUDFLARE_TUNNEL_REPLICAS:-2}"
+FASTAPI_ROLLOUT_TIMEOUT="${CYBERPULSE_FASTAPI_ROLLOUT_TIMEOUT:-65m}"
+WORKER_ROLLOUT_TIMEOUT="${CYBERPULSE_WORKER_ROLLOUT_TIMEOUT:-10m}"
 
 WEBAPP_NAMESPACE="${CYBERPULSE_WEBAPP_NAMESPACE:-dmz}"
 INTERNAL_NAMESPACE="${CYBERPULSE_INTERNAL_NAMESPACE:-internal}"
@@ -686,19 +688,30 @@ if [ -n "$VALUES_FILE" ]; then
   helm_args+=(--values "$VALUES_FILE")
 fi
 
-helm "${helm_args[@]}"
+paused_helm_args=(
+  "${helm_args[@]}"
+  --set "worker.replicas=0"
+  --set "worker.vulnerabilities.replicas=0"
+  --set "worker.system.replicas=0"
+)
+helm "${paused_helm_args[@]}"
 
 echo ""
 echo "=== Waiting for rollout ==="
 kubectl rollout status deployment docs -n "$WEBAPP_NAMESPACE" --timeout=120s
 kubectl rollout status deployment webapp -n "$WEBAPP_NAMESPACE" --timeout=120s
-kubectl rollout status deployment fastapi -n "$INTERNAL_NAMESPACE" --timeout=120s
-kubectl rollout status deployment worker -n "$INTERNAL_NAMESPACE" --timeout=120s
-kubectl rollout status deployment vulnerability-worker -n "$INTERNAL_NAMESPACE" --timeout=120s
-kubectl rollout status deployment system -n "$INTERNAL_NAMESPACE" --timeout=120s
+kubectl rollout status deployment fastapi -n "$INTERNAL_NAMESPACE" --timeout="$FASTAPI_ROLLOUT_TIMEOUT"
 if [ "$ACCESS_MODE" = "cloudflare" ]; then
   kubectl rollout status deployment cloudflared -n "$WEBAPP_NAMESPACE" --timeout=120s
 fi
+
+echo ""
+echo "=== Starting workers after database migrations ==="
+helm "${helm_args[@]}"
+
+kubectl rollout status deployment worker -n "$INTERNAL_NAMESPACE" --timeout="$WORKER_ROLLOUT_TIMEOUT"
+kubectl rollout status deployment vulnerability-worker -n "$INTERNAL_NAMESPACE" --timeout="$WORKER_ROLLOUT_TIMEOUT"
+kubectl rollout status deployment system -n "$INTERNAL_NAMESPACE" --timeout="$WORKER_ROLLOUT_TIMEOUT"
 
 echo ""
 echo "Ready!"

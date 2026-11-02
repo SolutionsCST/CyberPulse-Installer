@@ -166,6 +166,18 @@ CYBERPULSE_IMAGE_TAG=v1.2.1 ./install.sh
 
 FastAPI applies database migrations during startup.
 
+During upgrades, the installer temporarily scales all worker lanes to zero,
+waits for FastAPI and its database migrations to become ready, and only then
+starts the workers. Long migrations are protected by a one-hour startup probe
+and a matching 65-minute rollout timeout. The rollout settings can be adjusted
+when needed:
+
+```bash
+CYBERPULSE_FASTAPI_ROLLOUT_TIMEOUT=90m \
+CYBERPULSE_WORKER_ROLLOUT_TIMEOUT=15m \
+./install.sh
+```
+
 ## Uninstall
 
 To remove the production/installer deployment from a local test cluster:

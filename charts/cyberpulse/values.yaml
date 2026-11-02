@@ -42,6 +42,10 @@ cloudflare:
 fastapi:
   namespace: internal
   replicas: 1
+  startupProbe:
+    periodSeconds: 5
+    timeoutSeconds: 2
+    failureThreshold: 720
   corsOrigins: "http://localhost:3000,http://localhost:80"
   enableHsts: "false"
   enableApiDocs: "false"
